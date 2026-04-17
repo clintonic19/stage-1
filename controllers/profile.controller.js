@@ -8,6 +8,17 @@ const {
   getNationality
 } = require("../services/externalApi.services");
 
+const formatProfile = (profile) => {
+  if (!profile) {
+    return null;
+  }
+
+  const data = typeof profile.toJSON === "function" ? profile.toJSON() : { ...profile };
+  delete data._id;
+  delete data.__v;
+  return data;
+};
+
 
 // exports.createProfile = async (req, res, next) => {
 //   try {
@@ -139,7 +150,7 @@ exports.createProfile = async (req, res, next) => {
       return res.status(200).json({
         status: "success",
         message: "Profile already exists",
-        data: existingProfile
+        data: formatProfile(existingProfile)
       });
     }
 
@@ -206,7 +217,7 @@ exports.createProfile = async (req, res, next) => {
 
     return res.status(201).json({
       status: "success",
-      data: profile
+      data: formatProfile(profile)
     });
 
   } catch (err) {
@@ -214,11 +225,11 @@ exports.createProfile = async (req, res, next) => {
   }
 };
 
-exports.getProfileById = async (req, res) => {
+exports.getProfileById = async (req, res, next) => {
  try {
     const { id } = req.params;
 
-    const profile = await Profile.findById(id);
+    const profile = await Profile.findOne({ id });
 
   if (!profile) {
     return res.status(404).json({
@@ -229,7 +240,7 @@ exports.getProfileById = async (req, res) => {
 
   res.status(200).json({
     status: "success",
-    data: profile
+    data: formatProfile(profile)
   });
     
  } catch (error) {
@@ -238,7 +249,7 @@ exports.getProfileById = async (req, res) => {
 
 };
 
-exports.getAllProfiles = async (req, res) => {
+exports.getAllProfiles = async (req, res, next) => {
  try {
      const { gender, country_id, age_group } = req.query;
 
@@ -248,9 +259,9 @@ exports.getAllProfiles = async (req, res) => {
   if (country_id) filter.country_id = country_id.toUpperCase();
   if (age_group) filter.age_group = age_group.toLowerCase();
 
-  const profiles = await Profile.find(filter).select(
-    "id name gender age age_group country_id"
-  );
+  const profiles = await Profile.find(filter)
+    .select("id name gender gender_probability sample_size age age_group country_id country_probability created_at")
+    .lean();
 
   res.status(200).json({
     status: "success",
@@ -265,12 +276,12 @@ exports.getAllProfiles = async (req, res) => {
 };
 
 
-exports.deleteProfile = async (req, res) => {
+exports.deleteProfile = async (req, res, next) => {
 try {
     
     const { id } = req.params;
 
-  const profile = await Profile.findByIdAndDelete(id);
+  const profile = await Profile.findOneAndDelete({ id });
 
   if (!profile) {
     return res.status(404).json({
@@ -278,7 +289,7 @@ try {
       message: "Profile not found"
     });
   }
-  res.status(204).json({
+  res.status(200).json({
     status: "success",
     message: "Profile deleted successfully"
   });

@@ -6,30 +6,53 @@ const connectDB = require("./database/db");
 
 const app = express();
 
-// Connect to MongoDB
 connectDB();
 
-// Enable CORS (required)
 app.use(cors({ origin: "*" }));
 app.use(express.json());
 
-//main routes
 app.use("/api", getProfileRoute);
 
-// Health Check Route
-app.get('/api/health', (req, res) => {
+app.get("/api/health", (req, res) => {
   res.status(200).json({
-    success: true,
-    message: 'Stage-1 External API Backend server is running fine 🚀',
-    time: new Date().toISOString(),
+    status: "success",
+    message: "Stage-1 External API Backend server is running fine",
+    data: {
+      time: new Date().toISOString()
+    }
   });
 });
 
-// Start server
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Stage-1 Server running on port ${PORT}`);
+app.use((req, res) => {
+  res.status(404).json({
+    status: "error",
+    message: "Route not found"
+  });
 });
 
-// Export the app for testing
-// module.exports = app; 
+app.use((err, req, res, next) => {
+  console.error(err);
+
+  if (res.headersSent) {
+    return next(err);
+  }
+
+  const statusCode = err.status || err.statusCode || 500;
+  const message =
+    statusCode >= 500 ? "Internal server error" : err.message || "Request failed";
+
+  res.status(statusCode).json({
+    status: "error",
+    message
+  });
+});
+
+const PORT = process.env.PORT || 3000;
+
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`Stage-1 Server running on port ${PORT}`);
+  });
+}
+
+module.exports = app;
