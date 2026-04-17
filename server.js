@@ -26,9 +26,10 @@ app.get('/api/health', (req, res) => {
 });
 
 // Start server
-// const PORT = process.env.PORT || 3000;
-// app.listen(PORT, () => {
-//   console.log(`Stage-1 Server running on port ${PORT}`);
-// });
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Stage-1 Server running on port ${PORT}`);
+});
 
-module.exports = app; // Export the app for testing
+// Export the app for testing
+// module.exports = app; 

@@ -9,13 +9,14 @@ const connectDB = async () =>{
         });
 
         console.log(`Database connected: ${conn.connection.name}`);
+
         conn.connection.on('error', (err) => {
             console.log("mongoDB", err)
         })
 
     } catch (error) {
          console.error(`Error Connection to MongoDB: ${error.message}`);
-         process.exit(1);    
+        //  process.exit(1);    
      }
 };
 
