@@ -1,6 +1,5 @@
 // controllers/profile.controller.js
 const Profile = require("../models/profile.model");
-const { v7: uuidv7 } = require("uuid");
 const { getAgeGroup } = require("../utils/age.util");
 
 const {
@@ -12,6 +11,8 @@ const {
 
 exports.createProfile = async (req, res, next) => {
   try {
+    const { v7: uuidv7 } = require("uuid");
+    
     let  {name}  = req.body;
 
     if (!name) {
