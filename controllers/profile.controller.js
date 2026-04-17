@@ -9,24 +9,130 @@ const {
 } = require("../services/externalApi.services");
 
 
+// exports.createProfile = async (req, res, next) => {
+//   try {
+//     const { v7: uuidv7 } = require("uuid");
+
+//     let  {name}  = req.body;
+
+//     if (!name) {
+//       return res.status(400).json({
+//         status: "error",
+//         message: "Missing or empty name"
+//       });
+//     }
+
+//     // Normalize
+//     // APIs expect lowercase names, and it also helps with idempotency checks
+//     name = name.toLowerCase(); 
+
+//     // Idempotency check
+//     const existingProfile = await Profile.findOne({ name });
+
+//     if (existingProfile) {
+//       return res.status(200).json({
+//         status: "success",
+//         message: "Profile already exists",
+//         data: existingProfile
+//       });
+//     }
+
+//     // Call APIs in parallel
+//     const [gender, age, nation] = await Promise.all([
+//       getGender(name),
+//       getAge(name),
+//       getNationality(name)
+//     ]);
+
+//     // Edge cases
+//     if (!gender.gender || gender.count === 0) {
+//       return res.status(502).json({
+//         status: "error",
+//         message: "Genderize returned an invalid response"
+//       });
+//     }
+
+   
+//     if (!age.age) {
+//       return res.status(502).json({
+//         status: "error",
+//         message: "Agify returned an invalid response"
+//       });
+//     }
+
+//     // Nationalize can return an empty array if it has no data for the name
+//     if (!nation.country || nation.country.length === 0) {
+//       return res.status(502).json({
+//         status: "error",
+//         message: "Nationalize returned an invalid response"
+//       });
+//     }
+
+//     // Pick highest probability country
+//     const topCountry = nation.country.reduce((prev, curr) =>
+//       curr.probability > prev.probability ? curr : prev
+//     );
+
+//     // Create new profile
+//     const profile = new Profile({
+//       id: uuidv7(),
+//       name,
+//       gender: gender.gender,
+//       gender_probability: gender.probability,
+//       sample_size: gender.count,
+//       age: age.age,
+//       age_group: getAgeGroup(age.age),
+//       country_id: topCountry.country_id,
+//       country_probability: topCountry.probability,
+//       created_at: new Date().toISOString()
+//     });
+
+//     await profile.save();
+
+//     return res.status(201).json({
+//       status: "success",
+//       data: profile
+//     });
+
+//   } catch (err) {
+//     next(err);
+//   }
+// };
+
 exports.createProfile = async (req, res, next) => {
   try {
     const { v7: uuidv7 } = require("uuid");
-    
-    let  {name}  = req.body;
 
-    if (!name) {
+    let { name } = req.body || {};
+
+    // VALIDATION (MATCH TEST EXPECTATIONS)
+
+    if (name === undefined || name === null) {
       return res.status(400).json({
         status: "error",
-        message: "Missing or empty name"
+        message: "Name is required"
       });
     }
 
-    // Normalize
-    // APIs expect lowercase names, and it also helps with idempotency checks
-    name = name.toLowerCase(); 
+    if (typeof name !== "string") {
+      return res.status(422).json({
+        status: "error",
+        message: "Name must be a string"
+      });
+    }
 
-    // Idempotency check
+    name = name.trim();
+
+    if (name.length === 0) {
+      return res.status(400).json({
+        status: "error",
+        message: "Name cannot be empty"
+      });
+    }
+
+    name = name.toLowerCase();
+
+    // IDEMPOTENCY CHECK
     const existingProfile = await Profile.findOne({ name });
 
     if (existingProfile) {
@@ -37,53 +143,62 @@ exports.createProfile = async (req, res, next) => {
       });
     }
 
-    // Call APIs in parallel
-    const [gender, age, nation] = await Promise.all([
-      getGender(name),
-      getAge(name),
-      getNationality(name)
-    ]);
+    // SAFE API CALLS (NO CRASHING)
+    let gender, age, nation;
 
-    // Edge cases
-    if (!gender.gender || gender.count === 0) {
+    try {
+      [gender, age, nation] = await Promise.all([
+        getGender(name),
+        getAge(name),
+        getNationality(name)
+      ]);
+    } catch (err) {
       return res.status(502).json({
         status: "error",
-        message: "Genderize returned an invalid response"
+        message: "External API failure"
       });
     }
 
-   
-    if (!age.age) {
+    // SAFE VALIDATION (NO CRASHING ACCESS)
+
+    if (!gender || !gender.gender) {
       return res.status(502).json({
         status: "error",
-        message: "Agify returned an invalid response"
+        message: "Invalid gender response"
       });
     }
 
-    // Nationalize can return an empty array if it has no data for the name
-    if (!nation.country || nation.country.length === 0) {
+    if (!age || typeof age.age !== "number") {
       return res.status(502).json({
         status: "error",
-        message: "Nationalize returned an invalid response"
+        message: "Invalid age response"
       });
     }
 
-    // Pick highest probability country
-    const topCountry = nation.country.reduce((prev, curr) =>
-      curr.probability > prev.probability ? curr : prev
-    );
+    if (!nation || !Array.isArray(nation.country) || nation.country.length === 0) {
+      return res.status(502).json({
+        status: "error",
+        message: "Invalid nationality response"
+      });
+    }
 
-    // Create new profile
+    // SAFE REDUCE (PREVENT CRASH ON BAD DATA)
+    const topCountry = nation.country.reduce((prev, curr) => {
+      if (!prev) return curr;
+      return curr.probability > prev.probability ? curr : prev;
+    });
+
+    // CREATE PROFILE
     const profile = new Profile({
       id: uuidv7(),
       name,
       gender: gender.gender,
-      gender_probability: gender.probability,
-      sample_size: gender.count,
+      gender_probability: gender.probability ?? 0,
+      sample_size: gender.count ?? 0,
       age: age.age,
       age_group: getAgeGroup(age.age),
-      country_id: topCountry.country_id,
-      country_probability: topCountry.probability,
+      country_id: topCountry?.country_id || null,
+      country_probability: topCountry?.probability || 0,
       created_at: new Date().toISOString()
     });
 
@@ -98,7 +213,6 @@ exports.createProfile = async (req, res, next) => {
     next(err);
   }
 };
-
 
 exports.getProfileById = async (req, res) => {
  try {
