@@ -12,6 +12,12 @@ This project implements a backend system that:
 * Stores processed data in MongoDB
 * Exposes RESTful endpoints to manage the data
 
+Live API
+
+## 🌐 Base URL:
+
+https://stage-1-mu.vercel.app/api/profiles/
+
 ---
 
 ## Tech Stack
