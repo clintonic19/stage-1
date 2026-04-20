@@ -103,6 +103,7 @@ exports.createProfile = async (req, res, next) => {
 
     try {
       await profile.save();
+      
     } catch (error) {
       if (error && error.code === 11000) {
         const duplicateProfile = await Profile.findOne({ name });
@@ -119,6 +120,12 @@ exports.createProfile = async (req, res, next) => {
       throw error;
     }
 
+       await Profile.updateOne(
+      { name: profile.name },
+      { $setOnInsert: profile },
+      { upsert: true }
+  );
+
     return res.status(201).json({
       status: "success",
       data: formatProfile(profile)
@@ -134,7 +141,7 @@ exports.getProfileById = async (req, res, next) => {
  try {
     const { id } = req.params;
 
-    const profile = await Profile.findOne({ id });
+    const profile = await Profile.findById(id);
 
   if (!profile) {
     return res.status(404).json({
@@ -187,7 +194,7 @@ try {
     
     const { id } = req.params;
 
-  const profile = await Profile.findOneAndDelete({ id });
+  const profile = await Profile.findByIdAndDelete( id );
 
   if (!profile) {
     return res.status(404).json({
